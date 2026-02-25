@@ -1,5 +1,26 @@
+#For multiple structure that mimics this
+"""
+Docstring for main3_improved
+chin/
+ ├── Manga_A/
+ │    └── Chapter 1/
+ │         ├── 001.webp
+ │         └── 002.webp
+ │
+ ├── Manga_B/
+ │    └── Chapter 1/
+ │         ├── 001.webp
+
+ 
+Output
+Manga_A/
+  ├── Chapter 1/
+  └── translated/
+
+
+"""
+
 import os
-import sys
 import cv2
 import logging
 import re
@@ -28,62 +49,43 @@ logging.basicConfig(
 )
 
 # -------------------------------------------------
-# Main
+# Process Chapter 1 folder
 # -------------------------------------------------
-def main():
-    logging.info("=== MangaFlow started ===")
+def process_chapter1(chapter1_dir, model):
+    chapter1_dir = chapter1_dir.strip('"').strip()
 
-    # -------- INTERACTIVE INPUT --------
-    IMAGE_DIR = input(
-        "\n📁 Enter path to folder containing manga images:\n> "
-    ).strip('"').strip()
-
-    if not IMAGE_DIR:
-        logging.error("No path provided.")
+    if not os.path.isdir(chapter1_dir):
+        logging.error(f"Invalid directory: {chapter1_dir}")
         return
 
-    if not os.path.isdir(IMAGE_DIR):
-        logging.error(f"Invalid directory: {IMAGE_DIR}")
-        return
+    parent_dir = os.path.dirname(chapter1_dir)
+    translated_dir = os.path.join(parent_dir, "translated")
+    os.makedirs(translated_dir, exist_ok=True)
 
-    TRANSLATED_DIR = os.path.join(IMAGE_DIR, "translated")
-    os.makedirs(TRANSLATED_DIR, exist_ok=True)
+    logging.info(f"\n📘 Processing: {chapter1_dir}")
+    logging.info(f"📁 Output to: {translated_dir}")
 
-    logging.info(f"Input folder: {os.path.abspath(IMAGE_DIR)}")
-    logging.info(f"Output folder: {os.path.abspath(TRANSLATED_DIR)}")
+    reload_and_save_images(chapter1_dir)
 
-    # -------- Normalize images --------
-    reload_and_save_images(IMAGE_DIR)
-
-    # -------- Load YOLO --------
-    logging.info(f"Loading YOLO model: {MODEL_PATH}")
-    model = load_yolo_model(MODEL_PATH)
-
-    # -------- Collect images --------
     image_files = [
-        f for f in os.listdir(IMAGE_DIR)
+        f for f in os.listdir(chapter1_dir)
         if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))
     ]
 
     if not image_files:
-        logging.warning("No images found in folder.")
+        logging.warning("No images found in Chapter 1.")
         return
 
-    # -------------------------------------------------
-    # Process images
-    # -------------------------------------------------
     for image_file in image_files:
-        logging.info(f"Processing: {image_file}")
-        image_path = os.path.join(IMAGE_DIR, image_file)
-
+        image_path = os.path.join(chapter1_dir, image_file)
         image = cv2.imread(image_path)
+
         if image is None:
             logging.warning(f"Failed to read image: {image_file}")
             continue
 
-        # -------- YOLO detection --------
+        # YOLO detection
         results = detect_text_regions(model, image_path)
-
         text_regions = []
 
         for box, cls_id in zip(results[0].boxes.xyxy, results[0].boxes.cls):
@@ -92,7 +94,6 @@ def main():
 
             x1, y1, x2, y2 = map(int, box)
             cropped = image[y1:y2, x1:x2]
-
             pil_crop = Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
             text = mocr(pil_crop)
 
@@ -108,10 +109,9 @@ def main():
             })
 
         if not text_regions:
-            logging.info("No valid text regions detected.")
             continue
 
-        # -------- Clean & split --------
+        # Clean & split
         cleaned_regions = []
         for i, region in enumerate(text_regions):
             cleaned = clean_ocr_text(region["text"])
@@ -132,7 +132,7 @@ def main():
                     "coords": r["coords"]
                 }
 
-        # -------- Deduplicate --------
+        # Deduplicate
         all_sentences = []
         for rid, data in region_map.items():
             for s in data["sentences"]:
@@ -143,15 +143,12 @@ def main():
             if not any(is_similar(s, u[1]) for u in unique):
                 unique.append((rid, s))
 
-        logging.info(f"Unique sentences: {len(unique)}")
-
-        # -------- Batch translation --------
-        src_texts = [s for _, s in unique]
-        translations = translator_local.translate_text(src_texts)
+        translations = translator_local.translate_text(
+            [s for _, s in unique]
+        )
 
         translation_map = {}
-
-        for i, (rid, sentence) in enumerate(unique):
+        for i, (_, sentence) in enumerate(unique):
             raw = translations[i].text
             styled = manga_style_formatting(raw)
             styled = re.sub(r"\s+([!?.,])", r"\1", styled)
@@ -163,9 +160,7 @@ def main():
             if final:
                 translation_map[sentence] = final
 
-        # -------- Map back to regions --------
         region_translations = {}
-
         for rid, data in region_map.items():
             out = []
             for s in data["sentences"]:
@@ -186,9 +181,7 @@ def main():
                     "coords": data["coords"]
                 }
 
-        # -------- Overlay --------
         output_image = image.copy()
-
         for r in region_translations.values():
             output_image = insert_translation(
                 output_image,
@@ -202,15 +195,70 @@ def main():
             region_translations
         )
 
-        # -------- Save --------
-        output_path = os.path.join(
-            TRANSLATED_DIR,
+        out_path = os.path.join(
+            translated_dir,
             f"translated_{image_file}"
         )
-        cv2.imwrite(output_path, output_image)
-        logging.info(f"Saved: {output_path}")
+        cv2.imwrite(out_path, output_image)
+        logging.info(f"Saved: {out_path}")
 
-    logging.info("=== All done ===")
+# -------------------------------------------------
+# Find Chapter 1 folders
+# -------------------------------------------------
+def find_chapter1_folders(root_dir):
+    chapter1_folders = []
+
+    for name in os.listdir(root_dir):
+        manga_path = os.path.join(root_dir, name)
+        if not os.path.isdir(manga_path):
+            continue
+
+        chapter1 = os.path.join(manga_path, "Chapter 1")
+        if os.path.isdir(chapter1):
+            chapter1_folders.append(chapter1)
+
+    return chapter1_folders
+
+# -------------------------------------------------
+# Main interactive loop
+# -------------------------------------------------
+def main():
+    logging.info("=== MangaFlow Chapter-Aware Batch Mode ===")
+    logging.info(f"Loading YOLO model: {MODEL_PATH}")
+    model = load_yolo_model(MODEL_PATH)
+
+    while True:
+        print("\n📂 Enter ROOT folder path (e.g. chin)")
+        print("Press Ctrl+Z (Windows) / Ctrl+D (Linux/macOS) to start\n")
+
+        roots = []
+
+        try:
+            while True:
+                line = input("> ").strip()
+                if line:
+                    roots.append(line)
+        except EOFError:
+            pass
+
+        if not roots:
+            logging.info("No input provided. Exiting.")
+            break
+
+        for root in roots:
+            logging.info(f"\n🔍 Scanning: {root}")
+            chapters = find_chapter1_folders(root)
+
+            if not chapters:
+                logging.warning("No Chapter 1 folders found.")
+                continue
+
+            for chapter1 in chapters:
+                process_chapter1(chapter1, model)
+
+        logging.info("\n✅ Batch complete. Enter more roots or Ctrl+Z again to exit.")
+
+    logging.info("=== MangaFlow exited cleanly ===")
 
 
 if __name__ == "__main__":

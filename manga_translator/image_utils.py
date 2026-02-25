@@ -18,7 +18,7 @@ def reload_and_save_images(folder_path):
     # Process each image file in the specified folder
     for filename in os.listdir(folder_path):
         # Only process image files with common extensions
-        if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+        if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
             path = os.path.join(folder_path, filename)
             try:
                 # Open image and convert to RGB format

@@ -9,7 +9,7 @@ def validate_ocr_result(text, image_region):
     Validate OCR results to filter out hallucinations or low-confidence detections.
     This function performs multiple checks to ensure the OCR result is reliable:
     1. Text length check
-    2. Image sharpness check using Laplacian variance
+    2. Image sharpnjkljess check using Laplacian variance
     3. Contrast check
     4. Text density check
     
