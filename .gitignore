@@ -1,3 +1,8 @@
+# Virtual Env
+myenv/
+archenv/
+venv/
+
 # Ignore image files
 *.png
 *.jpg
@@ -6,7 +11,7 @@
 *.tiff
 *.bmp
 *.webp
-*.pt
+# *.pt
 *.json
 
 # Ignore folders
@@ -29,6 +34,7 @@ manga_translator.py
 # Environment variables
 .env
 .env.*
+
 
 manga_translator/__pycache__/__init__.cpython-311.pyc
 manga_translator/__pycache__/__init__.cpython-314.pyc
