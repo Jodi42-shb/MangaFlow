@@ -3,6 +3,7 @@ myenv/
 archenv/
 venv/
 .venv/
+__pycache__/
 
 # Ignore image files
 *.png
@@ -24,7 +25,6 @@ debug_text/
 examples/
 deployment/
 original_code/
-manga_translator/
 
 # Ignore files
 manga_translation.log
